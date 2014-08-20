@@ -22,6 +22,7 @@ use h4cc\AliceFixturesBundle\ORM\SchemaTool;
 use h4cc\AliceFixturesBundle\ORM\SchemaToolInterface;
 use h4cc\AliceFixturesBundle\Loader\FactoryInterface;
 use h4cc\AliceFixturesBundle\ORM\Doctrine;
+use Doctrine\Common\Persistence\ManagerRegistry;
 
 /**
  * Class FixtureManager
@@ -62,6 +63,8 @@ class FixtureManager implements FixtureManagerInterface
      */
     protected $schemaTool;
 
+    protected $managerRegistry;
+
     /**
      * @param array $options
      * @param ObjectManager $objectManager
@@ -71,7 +74,7 @@ class FixtureManager implements FixtureManagerInterface
      */
     public function __construct(
         array $options,
-        ObjectManager $objectManager,
+        ManagerRegistry $managerRegistry,
         FactoryInterface $loaderFactory,
         SchemaToolInterface $schemaTool,
         LoggerInterface $logger = null
@@ -81,10 +84,11 @@ class FixtureManager implements FixtureManagerInterface
             $this->getDefaultOptions(),
             $options
         );
-        $this->orm = new Doctrine($objectManager, $this->options['do_flush']);
         $this->loaderFactory = $loaderFactory;
         $this->schemaTool = $schemaTool;
         $this->logger = $logger;
+        $this->managerRegistry = $managerRegistry;
+        $this->orm = new Doctrine($managerRegistry->getManager(), $this->options['do_flush']);
     }
 
     /**
@@ -226,7 +230,10 @@ class FixtureManager implements FixtureManagerInterface
      */
     public function remove(array $entities)
     {
-        $this->getORM()->remove($entities);
+        foreach ($entities as &$entity) {
+
+            $this->managerRegistry->getManagerForClass(get_class($entity))->remove($entity);
+        }
     }
 
     /**
@@ -353,7 +360,21 @@ class FixtureManager implements FixtureManagerInterface
             }
         }
 
-        $persister->persist($objects);
+        foreach ($objects as &$obj)
+        {
+            $this->orm = new Doctrine($this->managerRegistry->getManagerForClass(get_class($obj)), $this->options['do_flush']);
+            $em = $this->managerRegistry->getManagerForClass(get_class($obj));
+            try {
+                $this->orm->persist(array($obj));
+            } catch (\Doctrine\ORM\ORMException $e) {
+                if ($e->getTrace()[0]['function'] == 'entityMissingForeignAssignedId') {
+                    $this->orm->flush();
+                    $this->orm->persist(array($obj));
+                }
+            }
+        }
+
+        unset($obj);
 
         foreach ($this->processors as $proc) {
             foreach ($objects as $obj) {

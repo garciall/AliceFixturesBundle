@@ -67,9 +67,10 @@ class h4ccAliceFixturesExtension extends Extension
             $managerServiceDefinition->setClass('%h4cc_alice_fixtures.manager.class%');
             $managerServiceDefinition->setArguments(array(
                 $managerConfig,
-                new Reference($this->getObjectManagerServiceIdForCurrentConfig($currentManagerConfig, $container)),
+                new Reference('doctrine'),
                 new Reference('h4cc_alice_fixtures.loader.factory'),
-                new Reference($schemaToolServiceId)
+                new Reference($schemaToolServiceId),
+                null
             ));
 
             // set manager
