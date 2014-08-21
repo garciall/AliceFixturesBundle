@@ -367,7 +367,8 @@ class FixtureManager implements FixtureManagerInterface
             try {
                 $this->orm->persist(array($obj));
             } catch (\Doctrine\ORM\ORMException $e) {
-                if ($e->getTrace()[0]['function'] == 'entityMissingForeignAssignedId') {
+                $trace = $e->getTrace();
+                if ($trace[0]['function'] == 'entityMissingForeignAssignedId') {
                     $this->orm->flush();
                     $this->orm->persist(array($obj));
                 }
